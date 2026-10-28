@@ -57,6 +57,8 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 #sky .grad { position: absolute; left: 0; top: 0; width: 100%; height: 100%; -webkit-transition: opacity 2s; transition: opacity 2s; }
 #sky .day { background: -webkit-linear-gradient(top, #F5F5F7, #E2E2E7); background: linear-gradient(#F5F5F7, #E2E2E7); }
 #sky .night { background: -webkit-linear-gradient(top, #1C1C1E, #0B0B0D); background: linear-gradient(#1C1C1E, #0B0B0D); opacity: 0; }
+#sky #wallpaper { position: absolute; left: 0; top: 0; width: 100%; height: 100%; background-size: cover; background-position: center; opacity: 0; -webkit-transition: opacity 0.8s; transition: opacity 0.8s; }
+#sky #wallpaper.on { opacity: 1; }
 #sky canvas { position: absolute; left: -4%; top: -4%; width: 108%; height: 108%; opacity: 0; -webkit-transition: opacity 0.8s; transition: opacity 0.8s; }
 #sky canvas.on { opacity: 1; }
 #sky .veil { position: absolute; left: 0; top: 0; width: 100%; height: 100%; background: rgba(245, 245, 247, 0.74); -webkit-transition: background-color 2s; transition: background-color 2s; }
@@ -64,6 +66,8 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .night #sky .day { opacity: 0; }
 .night #sky .night { opacity: 1; }
 .night #sky .veil { background: rgba(11, 11, 13, 0.78); }
+.custom-wallpaper #sky .veil { background: rgba(245, 245, 247, 0.62); }
+.night.custom-wallpaper #sky .veil { background: rgba(11, 11, 13, 0.64); }
 .night #sky .lift { background: #000; }
 .drawer-open #sky .lift { opacity: 0.32; }
 .night.drawer-open #sky .lift { opacity: 0.42; }
@@ -568,6 +572,22 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 #saver .clock .date { margin-top: 10px; font-size: 34px; font-weight: 500; color: rgba(255, 255, 255, 0.82); }
 #saver .clock .title { margin-top: 18px; font-size: 26px; font-weight: 500; color: rgba(255, 255, 255, 0.65); }
 #saver .clock .hint { margin-top: 8px; font-size: 22px; color: rgba(255, 255, 255, 0.55); }
+#saver .agenda {
+  position: absolute;
+  right: 80px;
+  bottom: 90px;
+  width: 620px;
+  padding: 24px 30px 28px;
+  border-radius: 30px;
+  color: #FFF;
+  background: -webkit-linear-gradient(top, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.1));
+  background: linear-gradient(rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.1));
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.24);
+}
+#saver .agenda-heading { margin-bottom: 14px; font-size: 26px; font-weight: 700; color: rgba(255, 255, 255, 0.76); }
+#saver .agenda-item { margin-top: 12px; overflow: hidden; }
+#saver .agenda-date { font-size: 20px; font-weight: 600; color: rgba(255, 255, 255, 0.65); }
+#saver .agenda-title { margin-top: 3px; font-size: 26px; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
 
 /* MARK: - Toast */
 
@@ -592,6 +612,8 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   z-index: 50;
 }
 #toast.on { opacity: 1; -webkit-transform: translate(-50%, 0); transform: translate(-50%, 0); }
+
+#personal-photo-files, #personal-calendar-file { position: absolute; left: -10000px; width: 1px; height: 1px; opacity: 0; }
 
 /* The Magic Remote's pointer: no text selection, no outlines. */
 * { -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }

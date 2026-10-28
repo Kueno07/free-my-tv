@@ -421,7 +421,7 @@
     if (!Data.hasKey() && st.zone === Z.TOP && st.top < 3) st.top = 3;
     var same = list.length === cards.length;
     for (var i = 0; same && i < list.length; i++) same = list[i].id === cards[i].id && list[i].backdrop === cards[i].backdrop && list[i].meta === cards[i].meta;
-    if (same && holder.children.length === list.length) return;
+    if (same && holder.children.length === list.length) { renderHomeBackdrop(); return; }
     cards = list;
     holder.innerHTML = '';
     for (var c = 0; c < list.length; c++) {
@@ -437,7 +437,7 @@
     }
     st.card = Math.min(st.card, Math.max(0, list.length - 1));
     if (!list.length && st.zone === Z.CARDS) st.zone = Z.SHELF;
-    backdrop(list.length ? Data.image(list[0].backdrop, 'w300') : '');
+    renderHomeBackdrop();
     updateFocus();
   }
 
@@ -465,10 +465,28 @@
 
   var bgUrl = null, bgFront = 'bgA';
 
+  function renderHomeBackdrop() {
+    var photos = TV.name === 'webos' ? UserMedia.photos() : [], selected = Prefs.backgroundPhoto();
+    var index = selected === 'auto' ? -1 : parseInt(selected, 10);
+    if (index >= 0 && photos[index]) backdrop(photos[index].data);
+    else backdrop(cards.length ? Data.image(cards[0].backdrop, 'w300') : '');
+  }
+
   /** The first pick's photo as the background: drawn tiny and stretched, it's already as soft as a heavy blur. */
   function backdrop(url) {
     if (url === bgUrl) return;
     bgUrl = url;
+    var wallpaper = $('wallpaper'), custom = url.indexOf('data:image/jpeg;base64,') === 0;
+    setClass(body, 'custom-wallpaper', custom);
+    if (custom) {
+      wallpaper.style.backgroundImage = 'url(' + url + ')';
+      setClass(wallpaper, 'on', true);
+      setClass($('bgA'), 'on', false);
+      setClass($('bgB'), 'on', false);
+      return;
+    }
+    wallpaper.style.backgroundImage = '';
+    setClass(wallpaper, 'on', false);
     var next = bgFront === 'bgA' ? 'bgB' : 'bgA';
     if (!url) {
       setClass($('bgA'), 'on', false);
@@ -751,6 +769,33 @@
       {label: tr('Quotes widget'), toggle: Prefs.quotes(),
         step: function () { Prefs.set('quotes', !Prefs.quotes()); Data.settingsChanged(); }}
     ];
+    if (TV.name === 'webos') {
+      rows.splice(5, 0,
+        {label: tr('Personal photos'), value: String(UserMedia.photos().length), opens: true,
+          step: function (d) { if (d >= 0) { var input = $('personal-photo-files'); input.value = ''; input.click(); } }},
+        {label: tr('Calendar file'), value: String(UserMedia.events().length), opens: true,
+          step: function (d) { if (d >= 0) { var input = $('personal-calendar-file'); input.value = ''; input.click(); } }},
+        {label: tr('Clear personal media'), value: '›',
+          step: function () {
+            if (!window.confirm(tr('Remove saved photos and calendar events?'))) return;
+            UserMedia.removePhotos();
+            UserMedia.removeCalendar();
+            Prefs.set('backgroundPhoto', 'auto');
+            renderHomeBackdrop();
+          }},
+        {label: tr('Background photo'), value: (function () {
+          var selected = Prefs.backgroundPhoto();
+          return selected === 'auto' ? tr('Automatic') : trf('Photo {n}', {n: parseInt(selected, 10) + 1});
+        })(),
+          step: function (d) {
+            var choices = ['auto'];
+            for (var p = 0; p < UserMedia.photos().length; p++) choices.push(String(p));
+            var current = choices.indexOf(Prefs.backgroundPhoto());
+            Prefs.set('backgroundPhoto', choices[(current + (d || 1) + choices.length) % choices.length]);
+            renderHomeBackdrop();
+          }}
+      );
+    }
     var names = ['Bitcoin', 'Ethereum', 'Solana', tr('Dollar')];
     var count = Data.currency === 'BRL' ? 4 : 3;
     for (var i = 0; i < count; i++) {
@@ -808,6 +853,7 @@
       hover(row, Z.SETTINGS, i);
     }
     el('div', 'hint', box, tr('OK or the arrows change the value.'));
+    if (TV.name === 'webos') el('div', 'hint', box, tr('Photos stay on this TV. Reimport the .ics file to refresh the agenda.'));
     updateFocus();
   }
 
@@ -1411,7 +1457,8 @@
 
   /** The screensaver's photos: picks with an app on the TV. */
   function saverPhotos() {
-    return Data.showcase().filter(function (p) { return p.backdrop && Data.usable(p.app); });
+    var local = UserMedia.photos().map(function (p) { return {backdrop: p.data, title: p.name, app: ''}; });
+    return local.concat(Data.showcase().filter(function (p) { return p.backdrop && Data.usable(p.app); }));
   }
 
   function showSaver() {
@@ -1427,6 +1474,18 @@
     el('div', 'date', clock);
     el('div', 'title', clock);
     var hint = el('div', 'hint', clock);
+    var agendaItems = UserMedia.events().slice(0, 3);
+    if (agendaItems.length) {
+      var agenda = el('div', 'agenda', s);
+      el('div', 'agenda-heading', agenda, tr('Coming up'));
+      for (var ai = 0; ai < agendaItems.length; ai++) {
+        var event = agendaItems[ai], item = el('div', 'agenda-item', agenda);
+        var date = formatDate('format|EEEE, MMMM d', event.at) +
+          (event.allDay ? '' : ' · ' + formatDate('format|h:mm a', event.at));
+        el('div', 'agenda-date', item, date);
+        el('div', 'agenda-title', item, event.title);
+      }
+    }
     var front = a;
     function next() {
       if (!saverOn) return;
@@ -1491,6 +1550,24 @@
     e.preventDefault();
   });
   document.addEventListener('mousemove', function () { poke(); });
+
+  $('personal-photo-files').onchange = function () {
+    UserMedia.importPhotos(this.files, function (err, count, added, failed) {
+      if (err) toast(tr(err.message === 'TV storage is full' ? 'TV storage is full' : 'Could not import photos'));
+      else if (added) {
+        toast(tr('Personal photos saved') + (failed ? ' · ' + tr('Some files were skipped') : ''));
+        renderHomeBackdrop();
+      }
+      if (st.zone === Z.SETTINGS) renderSettings();
+    });
+  };
+  $('personal-calendar-file').onchange = function () {
+    UserMedia.importCalendar(this.files && this.files[0], function (err, count) {
+      if (err) toast(tr(err.message === 'TV storage is full' ? 'TV storage is full' : 'Could not import calendar'));
+      else toast(trf('{n} calendar events imported', {n: count}));
+      if (st.zone === Z.SETTINGS) renderSettings();
+    });
+  };
 
   /**
    * In a text field, the keys type (← → move in the text, Delete erases). OK or the keyboard's Done searches (or saves); Back,
@@ -1585,7 +1662,8 @@
   I18N.set(Prefs.language());
   checkNight();   // now, from the last forecast: not after the TV lists its apps, with the day look until then
   // LG's screensaver waits only when ours will show: not under a sheet (ours waits there), and not without photos.
-  TV.holdScreenSaver(function () { return !sheetOpen() && saverPhotos().length > 0; });
+  TV.holdScreenSaver(function () { return !sheetOpen() && (saverPhotos().length > 0 ||
+    (TV.name === 'webos' && UserMedia.events().length > 0)); });
   fit();
   renderTop();
   tickClock();
