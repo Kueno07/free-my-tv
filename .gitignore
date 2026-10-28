@@ -5,6 +5,8 @@ config.properties
 # An LG TV's app list and icons (webos/apps.py)
 webos-apps.local.json
 webos-icons.local/
+webos/photos.local/
+webos/calendar.local.json
 
 # Build output
 out/

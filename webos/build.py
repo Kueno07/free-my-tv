@@ -13,9 +13,11 @@ ares-package does (an ar archive with control.tar.gz and data.tar.gz), so no LG 
 import io
 import json
 import os
+import re
 import sys
 import tarfile
 import time
+from datetime import datetime
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, 'tools'))
@@ -26,6 +28,9 @@ IPK = os.path.join(ROOT, 'FreeMyTV-webos.ipk')
 # A TV's app list and icons from webos/apps.py, for TVs that won't list their apps to the app (webOS 3).
 APP_LIST = os.path.join(ROOT, 'webos-apps.local.json')
 APP_ICONS = os.path.join(ROOT, 'webos-icons.local')
+PERSONAL_PHOTOS = os.path.join(ROOT, 'webos', 'photos.local')
+PERSONAL_CALENDAR = os.path.join(ROOT, 'webos', 'calendar.local.json')
+PHOTO_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.webp')
 
 
 def tv_apps():
@@ -44,6 +49,49 @@ def tv_apps():
             else:
                 app['icon'] = ''
     return apps, icons
+
+
+def personal_media(include_private):
+    """Package this user's photos and event snapshot only in a local, non-generic build."""
+    result = {'files': {}, 'photos': [], 'events': []}
+    if not include_private:
+        return result
+
+    if os.path.isdir(PERSONAL_PHOTOS):
+        names = sorted(os.listdir(PERSONAL_PHOTOS), key=lambda name: name.lower())
+        for name in names:
+            if not name.lower().endswith(PHOTO_EXTENSIONS):
+                continue
+            if not re.match(r'^[A-Za-z0-9._-]+$', name) or name in ('.', '..'):
+                sys.exit('webos/photos.local: use filenames with only letters, numbers, dots, underscores or hyphens.')
+            path = os.path.join(PERSONAL_PHOTOS, name)
+            if not os.path.isfile(path):
+                continue
+            if len(result['photos']) >= 6:
+                sys.exit('webos/photos.local: up to six photos can be included.')
+            target = 'photos/' + name
+            with open(path, 'rb') as f:
+                result['files'][target] = f.read()
+            result['photos'].append({'name': 'Photo %d' % (len(result['photos']) + 1), 'src': target})
+
+    if os.path.isfile(PERSONAL_CALENDAR):
+        try:
+            with open(PERSONAL_CALENDAR, encoding='utf-8-sig') as f:
+                events = json.load(f)
+        except (OSError, ValueError) as e:
+            sys.exit('webos/calendar.local.json: could not read calendar entries (%s).' % e)
+        if not isinstance(events, list):
+            sys.exit('webos/calendar.local.json: expected a list of events.')
+        for event in events:
+            if not isinstance(event, dict) or not isinstance(event.get('title'), str) or not isinstance(event.get('start'), str):
+                sys.exit('webos/calendar.local.json: each event needs title and start fields.')
+            try:
+                datetime.fromisoformat(event['start'].replace('Z', '+00:00'))
+            except ValueError:
+                sys.exit('webos/calendar.local.json: event start must be ISO 8601.')
+            result['events'].append({'title': event['title'][:180], 'start': event['start'],
+                                     'allDay': bool(event.get('allDay', False))})
+    return result
 
 
 def tar_gz(entries):
@@ -85,8 +133,14 @@ def build(preview, config, generic=False):
     apps, icons = ([], {}) if generic else tv_apps()   # one TV's list never goes in a release
     if apps:
         config = dict(config, installedApps=apps)
+    media = personal_media(not generic)
+    if media['photos']:
+        config = dict(config, backgroundPhoto='0')
     app = webapp.files(config, 'webos/build.py')
     app.update(icons)
+    app.update(media['files'])
+    app['personal-media.js'] = ('window.PERSONAL_MEDIA = %s;\n' % json.dumps(
+        {'photos': media['photos'], 'events': media['events']}, ensure_ascii=False)).encode('utf-8')
     for name in ('appinfo.json', 'icon.png', 'largeIcon.png'):
         with open(os.path.join(ROOT, 'webos', name), 'rb') as f:
             app[name] = f.read()
