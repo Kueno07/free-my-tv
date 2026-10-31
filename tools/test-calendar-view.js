@@ -27,4 +27,16 @@ assert.deepStrictEqual(Array.from(view.upcomingEvents(data,new Date('2026-11-02T
 assert.deepStrictEqual(Array.from(view.upcomingEvents(data,new Date('2026-11-03T22:00:00Z'),3), x=>x.title),['First','Second','Third']);
 assert.strictEqual(view.render(null,'2024-02-15',new Date('2024-02-15T12:00:00Z')).cells.length,42);
 assert.strictEqual(view.render(null,'2024-02-15',new Date('2024-02-15T12:00:00Z')).cells.filter(x=>x.date==='2024-02-29').length,1);
+assert.strictEqual(view.formatEventDate('2026-11-05','en-US'),'Thu, Nov 5');
+assert.notStrictEqual(view.revision(data,new Date('2026-11-02T02:59:00Z')),view.revision(data,new Date('2026-11-02T03:00:00Z')));
+const eventBoundary = {updatedAt:data.updatedAt,meals:data.meals,eventDates:data.eventDates,upcomingEvents:[{date:'2026-11-02',title:'Soon',start:'2026-11-02T13:00:00Z',allDay:false},{date:'2026-11-03',title:'Later',allDay:true}]};
+assert.notStrictEqual(view.revision(eventBoundary,new Date('2026-11-02T12:59:00Z')),view.revision(eventBoundary,new Date('2026-11-02T13:00:00Z')));
+const ordered = {upcomingEvents:[{date:'2026-11-02',title:'Late',start:'2026-11-03T02:00:00Z',allDay:false},{date:'2026-11-03',title:'All day',allDay:true}]};
+assert.deepStrictEqual(Array.from(view.upcomingEvents(ordered,new Date('2026-11-02T12:00:00Z'),3),x=>x.title),['Late','All day']);
+const sameDay = {upcomingEvents:[{date:'2026-11-02',title:'Timed',start:'2026-11-02T15:00:00Z',allDay:false},{date:'2026-11-02',title:'All day',allDay:true}]};
+assert.deepStrictEqual(Array.from(view.upcomingEvents(sameDay,new Date('2026-11-02T12:00:00Z'),3),x=>x.title),['All day','Timed']);
+const oldIntl = {DateTimeFormat:function(locale,options){assert.strictEqual(options.hour12,false);return {formatToParts:function(){return [{type:'year',value:'2026'},{type:'month',value:'11'},{type:'day',value:'01'},{type:'hour',value:'24'},{type:'minute',value:'00'}];}};}};
+const oldContext = {window:{},Date,Intl:oldIntl};
+vm.runInNewContext(fs.readFileSync(source,'utf8'),oldContext);
+assert.strictEqual(oldContext.window.CalendarView.currentMeal(data,new Date('2026-11-01T03:00:00Z')).title,'Rice');
 console.log('CalendarView checks passed');

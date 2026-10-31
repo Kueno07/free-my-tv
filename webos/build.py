@@ -27,6 +27,7 @@ IPK = os.path.join(ROOT, 'FreeMyTV-webos.ipk')
 # A TV's app list and icons from webos/apps.py, for TVs that won't list their apps to the app (webOS 3).
 APP_LIST = os.path.join(ROOT, 'webos-apps.local.json')
 APP_ICONS = os.path.join(ROOT, 'webos-icons.local')
+PHOTO_DIR = os.path.join(ROOT, 'webos', 'photos.local')
 
 
 def tv_apps():
@@ -45,6 +46,43 @@ def tv_apps():
             else:
                 app['icon'] = ''
     return apps, icons
+
+
+def personal_photo_assets(photo_dir, generic=False):
+    """A personal build may package validated local JPEG/PNG files; releases always get an empty manifest."""
+    files = {}
+    names = []
+    if not generic and os.path.isdir(photo_dir):
+        for name in sorted(os.listdir(photo_dir), key=lambda value: value.lower()):
+            if not name or name in ('.', '..') or not name[0].isalnum() or not all(c.isalnum() or c in '._-' for c in name):
+                continue
+            ext = os.path.splitext(name)[1].lower()
+            if ext not in ('.jpg', '.jpeg', '.png'):
+                continue
+            path = os.path.join(photo_dir, name)
+            if os.path.islink(path) or not os.path.isfile(path):
+                continue
+            size = os.path.getsize(path)
+            if size < 8 or size > 20 * 1024 * 1024:
+                continue
+            with open(path, 'rb') as image:
+                data = image.read()
+            is_jpeg = ext in ('.jpg', '.jpeg') and data.startswith(b'\xff\xd8\xff')
+            is_png = ext == '.png' and data.startswith(b'\x89PNG\r\n\x1a\n')
+            if not (is_jpeg or is_png):
+                continue
+            target = 'personal-photos/' + name
+            files[target] = data
+            names.append(target)
+    files['personal-photos.js'] = ('window.PERSONAL_PHOTOS = %s;\n' % json.dumps(names, ensure_ascii=False)).encode('utf-8')
+    return files
+
+
+def application_files(config, generic=False, photo_dir=None):
+    """The web app payload consumed by the package builder; photo_dir is injectable for isolated build checks."""
+    app = webapp.files(config, 'webos/build.py')
+    app.update(personal_photo_assets(photo_dir or PHOTO_DIR, generic=generic))
+    return app
 
 
 def tar_gz(entries):
@@ -128,7 +166,7 @@ def build(preview, config, generic=False, hd=False):
     apps, icons = ([], {}) if generic else tv_apps()   # one TV's list never goes in a release
     if apps:
         config = dict(config, installedApps=apps)
-    app = webapp.files(config, 'webos/build.py')
+    app = application_files(config, generic=generic)
     app.update(icons)
     for name in ('appinfo.json', 'icon.png', 'largeIcon.png'):
         with open(os.path.join(ROOT, 'webos', name), 'rb') as f:

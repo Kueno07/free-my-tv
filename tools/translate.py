@@ -118,7 +118,8 @@ def java_calls():
             if not name.endswith(".java"):
                 continue
             path = os.path.join(dirpath, name)
-            text = open(path, encoding="utf-8").read()
+            with open(path, encoding="utf-8") as source:
+                text = source.read()
             for m in CALL.finditer(text):
                 line = text.count("\n", 0, m.start()) + 1
                 prefix = text[text.rfind("\n", 0, m.start()) + 1:m.start()].lstrip()
@@ -133,7 +134,8 @@ def web_calls():
         if not name.endswith(".js") or name == "strings.js":   # strings.js is where the calls are made, not used
             continue
         path = os.path.join(WEB, name)
-        text = open(path, encoding="utf-8").read()
+        with open(path, encoding="utf-8") as source:
+            text = source.read()
         for m in WEB_CALL.finditer(text):
             line = text.count("\n", 0, m.start()) + 1
             prefix = text[text.rfind("\n", 0, m.start()) + 1:m.start()].lstrip()

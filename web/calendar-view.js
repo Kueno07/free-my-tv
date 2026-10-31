@@ -9,9 +9,11 @@
     if (isNaN(date.getTime())) date = new Date();
     try {
       var parts = new Intl.DateTimeFormat('en-CA', {timeZone: ZONE, year: 'numeric', month: '2-digit', day: '2-digit',
-        hour: '2-digit', minute: '2-digit', hourCycle: 'h23'}).formatToParts(date), result = {};
+        hour: '2-digit', minute: '2-digit', hour12: false}).formatToParts(date), result = {};
       for (var i = 0; i < parts.length; i++) result[parts[i].type] = parts[i].value;
-      return {year: Number(result.year), month: Number(result.month), day: Number(result.day), hour: Number(result.hour),
+      var hour = Number(result.hour);
+      if (hour === 24) hour = 0;
+      return {year: Number(result.year), month: Number(result.month), day: Number(result.day), hour: hour,
         minute: Number(result.minute), key: result.year + '-' + result.month + '-' + result.day};
     } catch (e) {
       // Sao Paulo has observed UTC-03:00 since 2019; this keeps older TV WebKit functional.
@@ -58,16 +60,31 @@
     var future = all.filter(function (event) {
       if (!event || !event.title || !/^\d{4}-\d{2}-\d{2}$/.test(event.date) || event.date < p.key) return false;
       if (event.allDay) return true;
-      if (event.start) { var start = new Date(event.start).getTime(); return !isNaN(start) && start >= current; }
+      if (event.start) { var start = new Date(event.start).getTime(); return !isNaN(start) && start > current; }
       return event.date >= p.key;
     });
     future.sort(function (a, b) {
-      var ta = a.start && !a.allDay ? new Date(a.start).getTime() : Date.parse(a.date + 'T00:00:00Z');
-      var tb = b.start && !b.allDay ? new Date(b.start).getTime() : Date.parse(b.date + 'T00:00:00Z');
+      if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+      if (a.allDay !== b.allDay) return a.allDay ? -1 : 1;
+      var ta = a.start && !a.allDay ? new Date(a.start).getTime() : 0;
+      var tb = b.start && !b.allDay ? new Date(b.start).getTime() : 0;
       return ta - tb || a.title.localeCompare(b.title);
     });
     return future.slice(0, Math.max(0, Math.min(Number(limit) || 3, 3)));
   }
 
-  root.CalendarView = {render: render, currentMeal: currentMeal, upcomingEvents: upcomingEvents};
+  function revision(snapshot, now) {
+    var events = upcomingEvents(snapshot, now, 3);
+    var eventKey = events.map(function (event) { return [event.date, event.title, event.start || '', event.end || '', event.allDay].join('~'); }).join('|');
+    return [(snapshot && snapshot.updatedAt) || '', partsAt(now || new Date()).key, eventKey].join('::');
+  }
+
+  function formatEventDate(date, locale) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '')) return date || '';
+    try { return new Intl.DateTimeFormat(locale || 'en-US', {weekday: 'short', month: 'short', day: 'numeric', timeZone: ZONE}).format(new Date(date + 'T12:00:00Z')); }
+    catch (e) { return date; }
+  }
+
+  root.CalendarView = {render: render, currentMeal: currentMeal, upcomingEvents: upcomingEvents, revision: revision,
+    formatEventDate: formatEventDate};
 }(window));

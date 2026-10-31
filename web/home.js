@@ -1512,7 +1512,7 @@
     try { localStorage.setItem('fmtv.night', night ? 'true' : 'false'); } catch (e) {}   // for index.html, next start
   }
 
-  var saverOn = false, idleAt = Date.now(), saverIndex = 0, saverTimer = 0, saverPick = null, SAVER_AFTER = 5 * 60000;
+  var saverOn = false, idleAt = Date.now(), saverIndex = 0, saverPick = null, saverCycle = null, photoFadeTimer = 0, SAVER_AFTER = 5 * 60000;
 
   /** "photos" (the picks' photos, as it always was) or "clock": what the screen shows when nobody touches it. */
   function saverMode() { return Prefs.saver(); }
@@ -1536,9 +1536,12 @@
     $('dim').className = 'layer' + (level ? ' d' + level : '');
   }
 
-  /** The screensaver's photos: picks with an app on the TV. */
+  /** The screensaver's photos: streaming picks plus optional local photos in a personal webOS build. */
   function saverPhotos() {
-    return Data.showcase().filter(function (p) { return p.backdrop && Data.usable(p.app); });
+    var photos = Data.showcase().filter(function (p) { return p.backdrop && Data.usable(p.app); });
+    var personal = window.PERSONAL_PHOTOS || [];
+    for (var i = 0; i < personal.length; i++) photos.push({personal: true, backdrop: personal[i], title: '', app: null});
+    return photos;
   }
 
   function showSaver() {
@@ -1556,23 +1559,29 @@
     el('div', 'title', clock);
     var hint = el('div', 'hint', clock);
     var calendar = el('div', 'calendar', s);
+    var expanded = el('div', 'calendar-expanded', s);
+    var expandedCalendar = el('div', 'calendar', expanded);
     var savedSnapshot = JoyceTV.snapshot();
     renderSaverCalendar(calendar, savedSnapshot, new Date());
-    calendar.setAttribute('data-updated', savedSnapshot ? savedSnapshot.updatedAt : '');
+    calendar.setAttribute('data-revision', CalendarView.revision(savedSnapshot, new Date()));
+    renderSaverCalendar(expandedCalendar, savedSnapshot, new Date());
+    expandedCalendar.setAttribute('data-revision', CalendarView.revision(savedSnapshot, new Date()));
     var front = a;
-    function next() {
+    function showPhoto() {
       if (!saverOn) return;
+      setClass(s, 'expanded-on', false);
       var p = photos.length ? photos[saverIndex++ % photos.length] : null;
       var back = front === a ? b : a;
       if (p) {
-        back.style.backgroundImage = 'url(' + Data.image(p.backdrop, 'original') + ')';
+        back.style.backgroundImage = 'url(' + (p.personal ? p.backdrop : Data.image(p.backdrop, 'original')) + ')';
         back.style.webkitTransform = back.style.transform = 'scale(1.0)';
-        clock.children[2].textContent = p.title;
-        saverPick = p;
+        clock.children[2].textContent = p.personal ? '' : p.title;
+        saverPick = p.personal ? null : p;
         // With Watch from the screensaver on, OK opens this title's app (any other key only closes).
-        var target = Prefs.saverWatch() ? pickTarget(p) : null;
+        var target = !p.personal && Prefs.saverWatch() ? pickTarget(p) : null;
         hint.textContent = target ? trf('Press OK to watch on {app} · any other button to close', {app: target.app.title}) : '';
-        setTimeout(function () {
+        clearTimeout(photoFadeTimer);
+        photoFadeTimer = setTimeout(function () {
           setClass(back, 'on', true);
           setClass(front, 'on', false);
           back.style.webkitTransform = back.style.transform = 'scale(1.08) translateX(-1.5%)';
@@ -1580,20 +1589,25 @@
         }, 60);
       }
       tickSaverClock(clock);
-      saverTimer = setTimeout(next, 12000);
     }
+    function showExpandedCalendar() {
+      if (!saverOn) return;
+      tickSaverClock(clock);
+      setClass(s, 'expanded-on', true);
+    }
+    saverCycle = SaverCycle.create({photo: showPhoto, expanded: showExpandedCalendar});
     setClass(s, 'on', true);
-    next();
+    saverCycle.start();
   }
 
   function tickSaverClock(clock) {
     var d = new Date();
     clock.firstChild.textContent = formatDate('format|h:mm', d.getTime());
     clock.children[1].textContent = formatDate('format|EEEE, MMMM d', d.getTime());
-    var snapshot = JoyceTV.snapshot(), calendar = $('saver').querySelector('.calendar'), updated = snapshot ? snapshot.updatedAt : '';
-    if (calendar && updated !== calendar.getAttribute('data-updated')) {
-      renderSaverCalendar(calendar, snapshot, d);
-      calendar.setAttribute('data-updated', updated);
+    var snapshot = JoyceTV.snapshot(), calendars = $('saver').querySelectorAll('.calendar'), revision = CalendarView.revision(snapshot, d);
+    for (var i = 0; i < calendars.length; i++) if (revision !== calendars[i].getAttribute('data-revision')) {
+      renderSaverCalendar(calendars[i], snapshot, d);
+      calendars[i].setAttribute('data-revision', revision);
     }
     var meal = clock.querySelector('.meal');
     if (!meal) meal = el('div', 'meal', clock);
@@ -1631,16 +1645,18 @@
     el('div', 'calendar-events-title', list, tr('Next events'));
     if (!events.length) el('div', 'calendar-empty', list, tr('No upcoming events'));
     for (var j = 0; j < events.length; j++) {
-      var eventDate = new Date(events[j].date + 'T12:00:00Z'), row = el('div', 'calendar-event', list);
-      el('span', 'calendar-event-date', row, formatDate('format|EEE, MMM d', eventDate.getTime()));
+      var row = el('div', 'calendar-event', list);
+      el('span', 'calendar-event-date', row, CalendarView.formatEventDate(events[j].date, I18N.locale()));
       el('span', 'calendar-event-name', row, events[j].title);
     }
-    if (snapshot) el('div', 'calendar-updated', container, tr('Updated') + ' ' + formatDate('format|h:mm a', Date.parse(snapshot.updatedAt)));
+    if (snapshot) el('div', 'calendar-updated', container, tr('Updated') + ' ' + formatDate('format|MMM d, h:mm a', Date.parse(snapshot.updatedAt)));
   }
 
   function hideSaver() {
     saverOn = false;
-    clearTimeout(saverTimer);
+    if (saverCycle) saverCycle.stop();
+    clearTimeout(photoFadeTimer);
+    photoFadeTimer = 0;
     setClass($('saver'), 'on', false);
   }
 
