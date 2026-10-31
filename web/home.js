@@ -320,11 +320,11 @@
 
   // MARK: - Focus
 
-  var Z = {TOP: 'top', CARDS: 'cards', SHELF: 'shelf', DRAWER: 'drawer', APPS: 'apps', SETTINGS: 'settings', EDIT: 'edit', LANG: 'lang', CITY: 'city', KEY: 'key', ABOUT: 'about'};
-  var st = {zone: Z.SHELF, top: 0, tab: 0, card: 0, shelf: 0, drawer: 0, grid: 0, row: 0, edit: 0, lang: 0, city: 0, key: 0};
+  var Z = {TOP: 'top', CARDS: 'cards', SHELF: 'shelf', DRAWER: 'drawer', APPS: 'apps', SETTINGS: 'settings', EDIT: 'edit', LANG: 'lang', CITY: 'city', KEY: 'key', JOYCE: 'joyce', ABOUT: 'about'};
+  var st = {zone: Z.SHELF, top: 0, tab: 0, card: 0, shelf: 0, drawer: 0, grid: 0, row: 0, edit: 0, lang: 0, city: 0, key: 0, joyce: 0};
   var cards = [];
 
-  function sheetOpen() { return st.zone === Z.APPS || st.zone === Z.SETTINGS || st.zone === Z.EDIT || st.zone === Z.LANG || st.zone === Z.CITY || st.zone === Z.KEY || st.zone === Z.ABOUT; }
+  function sheetOpen() { return st.zone === Z.APPS || st.zone === Z.SETTINGS || st.zone === Z.EDIT || st.zone === Z.LANG || st.zone === Z.CITY || st.zone === Z.KEY || st.zone === Z.JOYCE || st.zone === Z.ABOUT; }
 
   function updateFocus() {
     var i, list;
@@ -354,6 +354,7 @@
     if (langHint) langHint.textContent = (st.lang + 1) + ' / ' + languageChoices().length + '  ·  ' + tr('OK picks, Back cancels.');
     focusRows($('citypick'), st.city, st.zone === Z.CITY);
     focusRows($('keypick'), st.key, st.zone === Z.KEY);
+    focusRows($('joycepick'), st.joyce, st.zone === Z.JOYCE);
     setClass(body, 'drawer-open', st.zone === Z.DRAWER);
     followSoon();
   }
@@ -736,6 +737,9 @@
     setClass($('about'), 'open', false);
     closeField('citypick');
     closeField('keypick');
+    closeField('joycepick');
+    JoyceTV.cancelPairing();
+    setClass($('joycepick'), 'open', false);
     setClass($('citypick'), 'open', false);
     setClass($('keypick'), 'open', false);
     langHint = null;
@@ -802,6 +806,7 @@
       rows.push({label: tr('Open picks in'), value: open === 'nuvio' ? 'Nuvio' : tr('Streaming apps'),
         step: function (d) { cycle('openPicks', ['apps', 'nuvio'], open, d); }});
     }
+    rows.push({label: tr('Joyce TV pairing'), value: '›', joyce: true, step: function (d) { if (d >= 0) openJoyce(); }});
     rows.push({label: tr('Shelf'), value: '›', shelf: true, step: function (d) { if (d >= 0) openShelfEdit(); }});
     rows.push({label: tr('About this TV'), value: '›', about: true, step: function (d) { if (d >= 0) openAbout(); }});
     if (TV.canOpenSettings) rows.push({label: tr('TV Settings'), value: '›', step: function (d) { if (d >= 0) tvSettings(); }});
@@ -844,6 +849,46 @@
     st.row = 0;
     renderSettings();
     setClass($('settings'), 'open', true);
+    updateFocus();
+  }
+
+  // Joyce pairing: the device token remains in memory until Joyce confirms it.
+  var joyceMessage = '', joyceCode = '';
+  function renderJoyce() {
+    var box = $('joycepick').firstChild, old = fieldOf('joycepick'), typed = old ? old.value : JoyceTV.baseUrl(), inField = typingIn('joycepick');
+    box.innerHTML = '';
+    el('div', 'title', box, tr('Joyce TV pairing'));
+    var list = el('div', 'list', box), holder = el('div', 'rows', list);
+    list.style.height = '156px';
+    var field = textField(holder, Z.JOYCE, typed, 'https://', tr('Joyce URL'));
+    field.setAttribute('autocapitalize', 'none'); field.setAttribute('autocorrect', 'off');
+    hover(el('div', 'row', holder, tr('Start pairing')), Z.JOYCE, 1);
+    if (joyceCode) el('div', 'pairing-code', box, joyceCode);
+    if (joyceMessage) el('div', 'hint', box, joyceMessage);
+    el('div', 'hint', box, tr('Enter this code in Joyce settings.'));
+    if (inField) openField('joycepick');
+    updateFocus();
+  }
+  function openJoyce() {
+    setClass($('settings'), 'open', false); st.zone = Z.JOYCE; st.joyce = 0; joyceMessage = ''; joyceCode = '';
+    $('joycepick').firstChild.innerHTML = ''; renderJoyce(); setClass($('joycepick'), 'open', true); openField('joycepick');
+  }
+  function startJoyce() {
+    var field = fieldOf('joycepick'), url = field ? field.value.replace(/^\s+|\s+$/g, '') : '';
+    closeField('joycepick'); joyceCode = ''; joyceMessage = tr('Connecting to Joyce...'); renderJoyce();
+    JoyceTV.beginPairing(url, 'Free My TV', function (err, result) {
+      if (st.zone !== Z.JOYCE) return;
+      if (err) { joyceCode = ''; joyceMessage = err.code === 'SECURE_PAIRING_UNAVAILABLE' ? tr('Secure pairing is unavailable on this TV.') : tr('Pairing failed. Check the URL and try again.'); }
+      else if (result.status === 'pending') { joyceCode = result.code; joyceMessage = tr('Waiting for confirmation in Joyce.'); }
+      else if (result.status === 'active') { joyceCode = ''; joyceMessage = tr('TV paired with Joyce.'); }
+      else { joyceCode = ''; joyceMessage = tr('Pairing expired or was revoked. Try again.'); }
+      renderJoyce();
+    });
+  }
+  function closeJoyce() {
+    JoyceTV.cancelPairing(); closeField('joycepick'); setClass($('joycepick'), 'open', false);
+    joyceCode = ''; joyceMessage = ''; openSettings();
+    for (var i = 0; i < rowsNow.length; i++) if (rowsNow[i].joyce) st.row = i;
     updateFocus();
   }
 
@@ -1317,6 +1362,9 @@
       case Z.KEY:
         activateKey();
         return;
+      case Z.JOYCE:
+        if (st.joyce === 0) openField('joycepick'); else startJoyce();
+        return;
       case Z.ABOUT:
         closeAbout();
         return;
@@ -1386,6 +1434,9 @@
       case Z.CITY:
         if (dy) st.city = Math.max(0, Math.min(cityRows() - 1, st.city + dy));
         break;
+      case Z.JOYCE:
+        if (dy) st.joyce = Math.max(0, Math.min(1, st.joyce + dy));
+        break;
       case Z.KEY:
         if (dy) st.key = Math.max(0, Math.min(keyRows() - 1, st.key + dy));
         break;
@@ -1404,6 +1455,7 @@
     if (st.zone === Z.LANG) { closeLanguages(false); return; }
     if (st.zone === Z.CITY) { closeCities(false); return; }
     if (st.zone === Z.KEY) { if (keyAsking) askRemoveKey(false); else closeKey(); return; }
+    if (st.zone === Z.JOYCE) { closeJoyce(); return; }
     if (st.zone === Z.ABOUT) { closeAbout(); return; }
     if (sheetOpen()) { closeSheets(); return; }
     if (st.zone === Z.DRAWER) { closeDrawer(); return; }
@@ -1414,7 +1466,7 @@
   /** The pointer focuses what it's over (the Magic Remote, or a mouse when previewing). */
   function hover(node, zone, index) {
     node.onmouseover = function () {
-      if (saverOn || (sheetOpen() !== (zone === Z.APPS || zone === Z.SETTINGS || zone === Z.EDIT || zone === Z.LANG || zone === Z.CITY || zone === Z.KEY || zone === Z.ABOUT))) return;
+      if (saverOn || (sheetOpen() !== (zone === Z.APPS || zone === Z.SETTINGS || zone === Z.EDIT || zone === Z.LANG || zone === Z.CITY || zone === Z.KEY || zone === Z.JOYCE || zone === Z.ABOUT))) return;
       if (zone === Z.DRAWER && st.zone !== Z.DRAWER) return;
       if (zone !== Z.DRAWER && st.zone === Z.DRAWER && zone !== Z.SHELF) return;
       if (zone === Z.TOP && index < 3 && !Data.hasKey()) return;   // the tabs are hidden without the picks
@@ -1430,6 +1482,7 @@
       else if (zone === Z.LANG) st.lang = index;
       else if (zone === Z.CITY) st.city = index;
       else if (zone === Z.KEY) st.key = index;
+      else if (zone === Z.JOYCE) st.joyce = index;
       updateFocus();
     };
     node.onclick = function () { node.onmouseover(); activate(); };
@@ -1490,6 +1543,7 @@
 
   function showSaver() {
     var photos = saverPhotos();
+    JoyceTV.refreshCurrent();
     saverOn = true;
     saverPick = null;
     var s = $('saver');
@@ -1612,9 +1666,9 @@
    * its Cancel or ↑ ↓ leave the field. Samsung's keyboard sends Done as 65376 and Cancel as 65385. True: handled here.
    */
   function typing(k) {
-    var sheet = st.zone === Z.CITY ? 'citypick' : st.zone === Z.KEY ? 'keypick' : '';
+    var sheet = st.zone === Z.CITY ? 'citypick' : st.zone === Z.KEY ? 'keypick' : st.zone === Z.JOYCE ? 'joycepick' : '';
     if (!sheet || !typingIn(sheet)) return false;
-    if (k === TV.keys.ok || k === 65376) { if (st.zone === Z.CITY) searchCity(); else saveKey(); }
+    if (k === TV.keys.ok || k === 65376) { if (st.zone === Z.CITY) searchCity(); else if (st.zone === Z.JOYCE) startJoyce(); else saveKey(); }
     else if (k === TV.keys.back || k === 27 || k === 65385) { closeField(sheet); updateFocus(); }
     else if (k === TV.keys.up || k === TV.keys.down) { closeField(sheet); move(0, k === TV.keys.up ? -1 : 1); }
     return true;   // anything else types into the field
