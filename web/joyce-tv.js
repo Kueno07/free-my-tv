@@ -117,5 +117,5 @@
     }); });
   }
   if (base(get('base')) && /^[A-Za-z0-9_-]{43,128}$/.test(get('token') || '')) schedule();
-  window.JoyceTV = {beginPairing: beginPairing, cancelPairing: cancelPairing, configure: configure, refresh: refresh, refreshCurrent: refreshCurrent, snapshot: snapshot, updatedAt: function () { var s = snapshot(); return s ? s.updatedAt : null; }, validSnapshot: validSnapshot, monthRange: monthRange, baseUrl: function () { return get('base') || ''; }};
+  window.JoyceTV = {beginPairing: beginPairing, cancelPairing: cancelPairing, configure: configure, refresh: refresh, refreshCurrent: refreshCurrent, snapshot: snapshot, updatedAt: function () { var s = snapshot(); return s ? s.updatedAt : null; }, validSnapshot: validSnapshot, monthRange: monthRange, baseUrl: function () { return get('base') || 'https://assistente-culinario-joy-git-88a3c2-kelvinueno07-6836s-projects.vercel.app'; }};
 }());
