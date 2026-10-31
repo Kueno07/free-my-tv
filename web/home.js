@@ -1555,6 +1555,10 @@
     el('div', 'date', clock);
     el('div', 'title', clock);
     var hint = el('div', 'hint', clock);
+    var calendar = el('div', 'calendar', s);
+    var savedSnapshot = JoyceTV.snapshot();
+    renderSaverCalendar(calendar, savedSnapshot, new Date());
+    calendar.setAttribute('data-updated', savedSnapshot ? savedSnapshot.updatedAt : '');
     var front = a;
     function next() {
       if (!saverOn) return;
@@ -1586,6 +1590,52 @@
     var d = new Date();
     clock.firstChild.textContent = formatDate('format|h:mm', d.getTime());
     clock.children[1].textContent = formatDate('format|EEEE, MMMM d', d.getTime());
+    var snapshot = JoyceTV.snapshot(), calendar = $('saver').querySelector('.calendar'), updated = snapshot ? snapshot.updatedAt : '';
+    if (calendar && updated !== calendar.getAttribute('data-updated')) {
+      renderSaverCalendar(calendar, snapshot, d);
+      calendar.setAttribute('data-updated', updated);
+    }
+    var meal = clock.querySelector('.meal');
+    if (!meal) meal = el('div', 'meal', clock);
+    meal.innerHTML = '';
+    var picked = CalendarView.currentMeal(snapshot, d);
+    if (picked) {
+      el('div', 'meal-label', meal, picked.type === 'lunch' ? tr('Lunch') : tr('Dinner'));
+      el('div', 'meal-title', meal, picked.title);
+    }
+  }
+
+  function renderSaverCalendar(container, snapshot, now) {
+    container.innerHTML = '';
+    var data = CalendarView.render(snapshot, null, now), monthDate = new Date(Date.UTC(data.year, data.month - 1, 1, 12));
+    var title;
+    try { title = new Intl.DateTimeFormat(I18N.locale(), {month: 'long', year: 'numeric', timeZone: 'America/Sao_Paulo'}).format(monthDate); }
+    catch (e) { title = formatDate('format|MMMM yyyy', monthDate.getTime()); }
+    el('div', 'calendar-title', container, title);
+    var legend = el('div', 'calendar-legend', container);
+    var mealKey = el('span', 'calendar-legend-item', legend);
+    el('span', 'meal-marker', mealKey); el('span', 'calendar-legend-label', mealKey, tr('Meal selected'));
+    var eventKey = el('span', 'calendar-legend-item', legend);
+    el('span', 'event-marker', eventKey); el('span', 'calendar-legend-label', eventKey, tr('Event'));
+    var week = el('div', 'calendar-week', container), days = [tr('weekday|Mon'), tr('weekday|Tue'), tr('weekday|Wed'),
+      tr('weekday|Thu'), tr('weekday|Fri'), tr('weekday|Sat'), tr('weekday|Sun')];
+    for (var d = 0; d < days.length; d++) el('div', 'calendar-weekday', week, days[d]);
+    var grid = el('div', 'calendar-grid', container);
+    for (var i = 0; i < data.cells.length; i++) {
+      var cell = data.cells[i], box = el('div', 'calendar-day' + (cell.inMonth ? '' : ' outside') + (cell.today ? ' today' : ''), grid);
+      el('span', 'calendar-number', box, String(cell.day));
+      if (cell.meal) el('span', 'meal-marker', box);
+      if (cell.event) el('span', 'event-marker', box);
+    }
+    var events = CalendarView.upcomingEvents(snapshot, now, 3), list = el('div', 'calendar-events', container);
+    el('div', 'calendar-events-title', list, tr('Next events'));
+    if (!events.length) el('div', 'calendar-empty', list, tr('No upcoming events'));
+    for (var j = 0; j < events.length; j++) {
+      var eventDate = new Date(events[j].date + 'T12:00:00Z'), row = el('div', 'calendar-event', list);
+      el('span', 'calendar-event-date', row, formatDate('format|EEE, MMM d', eventDate.getTime()));
+      el('span', 'calendar-event-name', row, events[j].title);
+    }
+    if (snapshot) el('div', 'calendar-updated', container, tr('Updated') + ' ' + formatDate('format|h:mm a', Date.parse(snapshot.updatedAt)));
   }
 
   function hideSaver() {

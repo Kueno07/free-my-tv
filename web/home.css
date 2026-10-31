@@ -587,6 +587,35 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 #saver .clock .date { margin-top: 10px; font-size: 34px; font-weight: 500; color: rgba(255, 255, 255, 0.82); }
 #saver .clock .title { margin-top: 18px; font-size: 26px; font-weight: 500; color: rgba(255, 255, 255, 0.65); }
 #saver .clock .hint { margin-top: 8px; font-size: 22px; color: rgba(255, 255, 255, 0.55); }
+#saver .clock .meal { margin-top: 22px; white-space: normal; max-width: 560px; }
+#saver .clock .meal-label { font-size: 20px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255, 255, 255, 0.65); }
+#saver .clock .meal-title { margin-top: 6px; font-size: 30px; font-weight: 600; line-height: 1.2; }
+#saver .calendar {
+  position: absolute; right: 76px; top: 54px; width: 760px; padding: 30px 34px 24px; border-radius: 28px;
+  color: #FFF; background: rgba(12, 16, 16, 0.72); box-shadow: 0 22px 60px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+#saver .calendar-title { margin-bottom: 22px; font-size: 38px; font-weight: 650; text-transform: capitalize; }
+#saver .calendar-legend { display: -webkit-flex; display: flex; -webkit-justify-content: flex-end; justify-content: flex-end; gap: 22px; margin: -12px 0 16px; }
+#saver .calendar-legend-item { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; gap: 7px; font-size: 14px; color: rgba(255, 255, 255, 0.7); }
+#saver .calendar-legend .meal-marker, #saver .calendar-legend .event-marker { position: static; -webkit-flex: 0 0 auto; flex: 0 0 auto; }
+#saver .calendar-week, #saver .calendar-grid { display: -webkit-flex; display: flex; -webkit-flex-wrap: wrap; flex-wrap: wrap; }
+#saver .calendar-weekday, #saver .calendar-day { position: relative; box-sizing: border-box; width: 14.2857%; }
+#saver .calendar-weekday { padding-bottom: 10px; text-align: center; font-size: 17px; font-weight: 600; color: rgba(255, 255, 255, 0.56); }
+#saver .calendar-day { height: 58px; padding-top: 8px; text-align: center; border-radius: 12px; color: rgba(255, 255, 255, 0.94); }
+#saver .calendar-day.outside { color: rgba(255, 255, 255, 0.3); }
+#saver .calendar-day.today { background: rgba(59, 194, 139, 0.24); box-shadow: inset 0 0 0 2px #63D8A9; color: #FFF; }
+#saver .calendar-number { font-size: 22px; font-weight: 600; }
+#saver .meal-marker, #saver .event-marker { position: absolute; bottom: 6px; display: block; }
+#saver .meal-marker { left: calc(50% - 7px); width: 12px; height: 12px; border: 2px solid #F5D78E; border-radius: 50%; box-sizing: border-box; }
+#saver .meal-marker:after { content: ''; position: absolute; left: 2px; top: 2px; width: 4px; height: 4px; border: 1px solid #F5D78E; border-radius: 50%; }
+#saver .event-marker { left: calc(50% + 9px); width: 6px; height: 6px; border-radius: 50%; background: #8DC8FF; }
+#saver .calendar-events { margin-top: 18px; padding-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.18); }
+#saver .calendar-events-title { margin-bottom: 7px; font-size: 16px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255, 255, 255, 0.66); }
+#saver .calendar-event { display: -webkit-flex; display: flex; min-height: 29px; font-size: 18px; line-height: 1.3; }
+#saver .calendar-event-date { -webkit-flex: 0 0 146px; flex: 0 0 146px; color: #B9DFFF; }
+#saver .calendar-event-name { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+#saver .calendar-empty, #saver .calendar-updated { font-size: 15px; color: rgba(255, 255, 255, 0.56); }
+#saver .calendar-updated { margin-top: 12px; text-align: right; }
 
 /* MARK: - Toast */
 
