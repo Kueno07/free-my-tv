@@ -1592,6 +1592,7 @@
     }
     function showExpandedCalendar() {
       if (!saverOn) return;
+      saverPick = null;
       tickSaverClock(clock);
       setClass(s, 'expanded-on', true);
     }
@@ -1704,7 +1705,7 @@
     idleAt = Date.now();
     if (ambientOn) { hideAmbient(); return true; }
     if (!saverOn) return false;
-    var target = ok && Prefs.saverWatch() ? pickTarget(saverPick) : null;
+    var target = ok && saverCycle && SaverCycle.canWatch(saverCycle.stage()) && Prefs.saverWatch() ? pickTarget(saverPick) : null;
     hideSaver();
     if (target) launcher(target.app.id, target.app.title, target.params)();
     return true;
@@ -1836,7 +1837,8 @@
     checkNight();
     Data.refresh();
     applyDim();   // automatic: medium from 22:00, off again at 07:00
-    if (!saverOn && !ambientOn && !sheetOpen() && Date.now() - idleAt > SAVER_AFTER) {
+    if (SaverCycle.shouldStart({hidden: document.hidden, saverOn: saverOn, ambientOn: ambientOn, sheetOpen: sheetOpen(),
+      idleMs: Date.now() - idleAt, afterMs: SAVER_AFTER})) {
       if (saverMode() === 'clock') showAmbient(); else showSaver();
     }
     if (saverOn) tickSaverClock($('saver').querySelector('.clock'));
